@@ -7,6 +7,7 @@
 
 import * as Api from '../Api';
 import * as path from 'path';
+import {normalizePath} from '../PathUtils';
 import {usingRepository} from './Resource';
 
 const SAMPLE_REPO_VERSION = '0.0.0-56cf99a96';
@@ -14,11 +15,13 @@ const SAMPLE_REPO_VERSION = '0.0.0-56cf99a96';
 test('validateManifest', async () => {
   await usingRepository('sampleOverrideRepo', async (_, repoPath) => {
     const opts = {
-      manifestPath: path.join(repoPath, 'overrides.json'),
       reactNativeVersion: SAMPLE_REPO_VERSION,
     };
 
-    const validatonErrors = await Api.validateManifest(opts);
+    const validatonErrors = await Api.validateManifest(
+      path.join(repoPath, 'overrides.json'),
+      opts,
+    );
 
     expect(validatonErrors).toEqual([
       {
@@ -31,85 +34,92 @@ test('validateManifest', async () => {
 
 test('hasOverride', async () => {
   await usingRepository('sampleOverrideRepo', async (_, repoPath) => {
-    const opts = {
-      manifestPath: path.join(repoPath, 'overrides.json'),
-    };
+    const manifestPath = path.join(repoPath, 'overrides.json');
 
     expect(
-      await Api.hasOverride('ReactCommon\\yoga\\yoga\\Yoga.cpp', opts),
+      await Api.hasOverride('ReactCommon\\yoga\\yoga\\Yoga.cpp', manifestPath),
     ).toBe(true);
 
     expect(
-      await Api.hasOverride('ReactCommon\\yoga\\yoga\\Karate.cpp', opts),
+      await Api.hasOverride(
+        'ReactCommon\\yoga\\yoga\\Karate.cpp',
+        manifestPath,
+      ),
     ).toBe(false);
   });
 });
 
 test('removeOverride', async () => {
   await usingRepository('sampleOverrideRepo', async (_, repoPath) => {
-    const opts = {
-      manifestPath: path.join(repoPath, 'overrides.json'),
-    };
+    const manifestPath = path.join(repoPath, 'overrides.json');
 
     expect(
-      await Api.removeOverride('ReactCommon\\yoga\\yoga\\Yoga.cpp', opts),
+      await Api.removeOverride(
+        'ReactCommon\\yoga\\yoga\\Yoga.cpp',
+        manifestPath,
+      ),
     ).toBe(true);
 
     expect(
-      await Api.removeOverride('ReactCommon\\yoga\\yoga\\Karate.cpp', opts),
+      await Api.removeOverride(
+        'ReactCommon\\yoga\\yoga\\Karate.cpp',
+        manifestPath,
+      ),
     ).toBe(false);
   });
 });
 
 test('addOverride', async () => {
   await usingRepository('sampleOverrideRepo', async (_, repoPath) => {
+    const manifestPath = path.join(repoPath, 'overrides.json');
     const opts = {
-      manifestPath: path.join(repoPath, 'overrides.json'),
       reactNativeVersion: SAMPLE_REPO_VERSION,
     };
 
-    const factory = await Api.getOverrideFactory(opts);
+    const factory = await Api.getOverrideFactory(manifestPath, opts);
     const override = await factory.createPlatformOverride(
       'setUpDeveloperTools.windesktop.js',
     );
 
-    await Api.addOverride(override, opts);
+    await Api.addOverride(override, manifestPath);
     expect(
-      await Api.hasOverride('setUpDeveloperTools.windesktop.js', opts),
+      await Api.hasOverride('setUpDeveloperTools.windesktop.js', manifestPath),
     ).toBe(true);
 
-    expect(await Api.validateManifest(opts)).toEqual([]);
+    expect(await Api.validateManifest(manifestPath, opts)).toEqual([]);
   });
 });
 
 test('upgradeOverrides', async () => {
   await usingRepository('sampleOverrideRepo', async (repo, repoPath) => {
+    const manifestPath = path.join(repoPath, 'overrides.json');
     const opts = {
-      manifestPath: path.join(repoPath, 'overrides.json'),
       reactNativeVersion: '0.0.0-42c8dead6',
       allowConflicts: false,
       progressListener: expectIncrementing(3),
     };
 
-    const upgradeResults = await Api.upgradeOverrides(opts);
+    const upgradeResults = await Api.upgradeOverrides(manifestPath, opts);
 
     expect(upgradeResults).toEqual([
       {
         filesWritten: true,
         hasConflicts: false,
-        overrideName:
+        overrideName: normalizePath(
           'ReactCommon\\turbomodule\\samples\\SampleTurboCxxModule.cpp',
+        ),
       },
       {
         filesWritten: true,
         hasConflicts: false,
-        overrideName:
+        overrideName: normalizePath(
           'ReactCommon\\turbomodule\\samples\\SampleTurboCxxModule.h',
+        ),
       },
       {
         filesWritten: false,
         hasConflicts: true,
-        overrideName: 'ReactCommon\\yoga\\yoga\\Yoga.cpp',
+        overrideName: normalizePath('ReactCommon\\yoga\\yoga\\Yoga.cpp'),
       },
     ]);
 
@@ -117,17 +127,26 @@ test('upgradeOverrides', async () => {
       (await repo.readFile('sampleOverrideRepo/overrides.json'))!.toString(),
     );
 
+    expect(manifest.baseVersion).toBe(opts.reactNativeVersion);
+
     for (const serializedOverride of manifest.overrides) {
-      if (serializedOverride.file !== 'ReactCommon/yoga/yoga/Yoga.cpp') {
-        expect({
-          file: serializedOverride.file,
-          version: serializedOverride.baseVersion,
-        }).toEqual({
-          file: serializedOverride.file,
-          version: opts.reactNativeVersion,
-        });
+      if (serializedOverride.file === 'ReactCommon/yoga/yoga/Yoga.cpp') {
+        expect(serializedOverride.baseVersion).toBe('0.0.0-56cf99a96');
+      } else {
+        expect(serializedOverride.baseVersion).toBeUndefined();
       }
     }
+  });
+});
+
+test('diffOverride', async () => {
+  await usingRepository('sampleOverrideRepo', async (_, repoPath) => {
+    const manifestPath = path.join(repoPath, 'overrides.json');
+    const diff = await Api.diffOverride(
+      'ReactCommon/yoga/yoga/Yoga.cpp',
+      manifestPath,
+    );
+    expect(diff.length).toBeGreaterThan(0);
   });
 });
 

@@ -45,18 +45,18 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)Modules\PlatformConstantsModule.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Modules\SourceCodeModule.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Modules\StatusBarManagerModule.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)Modules\UIManagerModule.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Modules\WebSocketModule.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)OInstance.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)PackagerConnection.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)ShadowNode.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)ShadowNodeRegistry.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Threading\BatchingQueueThread.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Threading\MessageDispatchQueue.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Threading\MessageQueueThreadFactory.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)tracing\tracing.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)TurboModuleManager.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Utils.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)V8JSIRuntimeHolder.cpp">
       <ExcludedFromBuild Condition="'$(USE_V8)' != 'true'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="$(MSBuildThisFileDirectory)ViewManager.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)WinRTWebSocketResource.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -81,7 +81,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)HermesRuntimeHolder.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)IDevSupportManager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)IHttpResource.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)INativeUIManager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)InstanceManager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)IReactRootView.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)IRedBoxHandler.h" />
@@ -97,7 +96,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)Modules\PlatformConstantsModule.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Modules\SourceCodeModule.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Modules\StatusBarManagerModule.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)Modules\UIManagerModule.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Modules\WebSocketModule.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)NativeModuleProvider.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)OInstance.h" />
@@ -105,11 +103,15 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)ShadowNode.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)ShadowNodeRegistry.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)targetver.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Threading\BatchingQueueThread.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Threading\MessageDispatchQueue.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Threading\MessageQueueThreadFactory.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Tracing.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)tracing\fbsystrace.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)TurboModuleManager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)TurboModuleRegistry.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Utils.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Utils\CppWinrtLessExceptions.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)V8JSIRuntimeHolder.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)WebSocketJSExecutorFactory.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)WinRTWebSocketResource.h" />

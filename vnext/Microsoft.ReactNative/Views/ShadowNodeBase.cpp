@@ -6,18 +6,20 @@
 #include <IReactInstance.h>
 
 #include <Modules/NativeUIManager.h>
+#include <Modules/PaperUIManagerModule.h>
 #include <UI.Composition.h>
-#include <ViewManager.h>
 #include <Views/ExpressionAnimationStore.h>
 #include <Views/ShadowNodeBase.h>
+#include <Views/ViewManager.h>
 #include <Views/ViewManagerBase.h>
 #include <WindowsNumerics.h>
+#include <XamlUIService.h>
 #include "Views/KeyboardEventHandler.h"
 #include "XamlFeatures.h"
 
 using namespace std::placeholders;
 
-namespace react::uwp {
+namespace Microsoft::ReactNative {
 
 ShadowNodeBase::ShadowNodeBase() : m_view(nullptr) {}
 
@@ -25,17 +27,18 @@ ViewManagerBase *ShadowNodeBase::GetViewManager() const {
   return static_cast<ViewManagerBase *>(m_viewManager);
 }
 
-void ShadowNodeBase::updateProperties(const folly::dynamic &&props) {
+void ShadowNodeBase::updateProperties(winrt::Microsoft::ReactNative::JSValueObject &props) {
   GetViewManager()->UpdateProperties(this, props);
 }
 
 void ShadowNodeBase::createView() {
   m_view = GetViewManager()->CreateView(this->m_tag);
 
-  if (g_HasActualSizeProperty == TriBit::Undefined) {
+  if (react::uwp::g_HasActualSizeProperty == react::uwp::TriBit::Undefined) {
     if (auto uielement = m_view.try_as<xaml::UIElement>()) {
       // ActualSize works on 19H1+ only
-      g_HasActualSizeProperty = (uielement.try_as<xaml::IUIElement10>()) ? TriBit::Set : TriBit::NotSet;
+      react::uwp::g_HasActualSizeProperty =
+          (uielement.try_as<xaml::IUIElement10>()) ? react::uwp::TriBit::Set : react::uwp::TriBit::NotSet;
     }
   }
 }
@@ -44,8 +47,10 @@ bool ShadowNodeBase::NeedsForceLayout() {
   return false;
 }
 
-void ShadowNodeBase::dispatchCommand(const std::string &commandId, const folly::dynamic &commandArgs) {
-  GetViewManager()->DispatchCommand(GetView(), commandId, commandArgs);
+void ShadowNodeBase::dispatchCommand(
+    const std::string &commandId,
+    winrt::Microsoft::ReactNative::JSValueArray &&commandArgs) {
+  GetViewManager()->DispatchCommand(GetView(), commandId, std::move(commandArgs));
 }
 
 void ShadowNodeBase::removeAllChildren() {
@@ -81,21 +86,18 @@ void ShadowNodeBase::ReplaceChild(const XamlView &oldChildView, const XamlView &
 
 void ShadowNodeBase::ReparentView(XamlView view) {
   GetViewManager()->TransferProperties(m_view, view);
-  if (const auto instance = GetViewManager()->GetReactInstance().lock()) {
-    if (const auto nativeUIManager = static_cast<NativeUIManager *>(instance->NativeUIManager())) {
-      int64_t parentTag = GetParent();
-      auto host = nativeUIManager->getHost();
-      auto pParentNode = static_cast<ShadowNodeBase *>(host->FindShadowNodeForTag(parentTag));
-      if (pParentNode != nullptr) {
-        pParentNode->ReplaceChild(m_view, view);
-      }
+  if (auto nativeUIManager = GetNativeUIManager(GetViewManager()->GetReactContext()).lock()) {
+    int64_t parentTag = GetParent();
+    auto host = nativeUIManager->getHost();
+    auto pParentNode = static_cast<ShadowNodeBase *>(host->FindShadowNodeForTag(parentTag));
+    if (pParentNode != nullptr) {
+      pParentNode->ReplaceChild(m_view, view);
     }
   }
   ReplaceView(view);
 
   // Let the UIManager know about this so it can update the yoga context.
-  if (const auto instance = GetViewManager()->GetReactInstance().lock()) {
-    auto pNativeUiManager = static_cast<NativeUIManager *>(instance->NativeUIManager());
+  if (auto pNativeUiManager = GetNativeUIManager(GetViewManager()->GetReactContext()).lock()) {
     pNativeUiManager->ReplaceView(*static_cast<ShadowNode *>(this));
   }
 }
@@ -121,10 +123,9 @@ void ShadowNodeBase::UpdateTransformPS() {
     assert(uielement != nullptr);
     m_transformPS = EnsureTransformPS();
     m_transformPS.InsertVector3(L"center", {0, 0, 0});
-    auto instance = GetViewManager()->GetReactInstance().lock();
-    assert(instance != nullptr);
+
     auto centeringAnimation =
-        instance->GetExpressionAnimationStore().GetElementCenterPointExpression(GetCompositor(GetView()));
+        GetViewManager()->GetExpressionAnimationStore()->GetElementCenterPointExpression(GetCompositor(GetView()));
     centeringAnimation.SetExpressionReferenceParameter(L"uielement", uielement);
     m_transformPS.StartAnimation(L"center", centeringAnimation);
 
@@ -142,7 +143,9 @@ void ShadowNodeBase::UpdateTransformPS() {
   }
 }
 
-void ShadowNodeBase::UpdateHandledKeyboardEvents(std::string const &propertyName, folly::dynamic const &value) {
+void ShadowNodeBase::UpdateHandledKeyboardEvents(
+    std::string const &propertyName,
+    winrt::Microsoft::ReactNative::JSValue const &value) {
   EnsureHandledKeyboardEventHandler();
   m_handledKeyboardEventHandler->UpdateHandledKeyboardEvents(propertyName, value);
 }
@@ -156,10 +159,7 @@ void ShadowNodeBase::EnsureHandledKeyboardEventHandler() {
 }
 
 void ShadowNodeBase::YellowBox(const std::string &message) const noexcept {
-  const auto instance = GetViewManager()->GetReactInstance().lock();
-  if (instance) {
-    instance->CallJsFunction("RCTLog", "logToConsole", folly::dynamic::array("warn", message));
-  }
+  GetViewManager()->GetReactContext().CallJSFunction("RCTLog", "logToConsole", folly::dynamic::array("warn", message));
 }
 
-} // namespace react::uwp
+} // namespace Microsoft::ReactNative

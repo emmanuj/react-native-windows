@@ -8,6 +8,7 @@
 ; These modules have base components and win32 versions.
 ; Ideally we'd delete the base versions of files that had .win32 overrides as part of the
 ; initRNLibraries build step
+<PROJECT_ROOT>/index.js
 <PROJECT_ROOT>/Libraries/Alert/Alert.js
 <PROJECT_ROOT>/Libraries/Components/AccessibilityInfo/NativeAccessibilityInfo.js
 <PROJECT_ROOT>/Libraries/Components/Picker/Picker.js
@@ -25,15 +26,20 @@
 <PROJECT_ROOT>/Libraries/StyleSheet/StyleSheet.js
 <PROJECT_ROOT>/Libraries/Utilities/DeviceInfo.js
 <PROJECT_ROOT>/Libraries/Utilities/Dimensions.js
-<PROJECT_ROOT>/RNTester/js/components/FlatListExample.js
-<PROJECT_ROOT>/RNTester/js/components/ListExampleShared.js
-<PROJECT_ROOT>/RNTester/js/components/RNTesterExampleFilter.js
 
 ; Ignore react-native files in node_modules since they are copied into project root
 .*/node_modules/react-native/.*
 
+; Ignore react-native-windows' build output. Flow is not compiled with long path support and after running unittests these folders have long paths
+.*/node_modules/react-native-windows/build/.*
+.*/node_modules/react-native-windows/target/.*
+.*/node_modules/react-native-windows/Microsoft.ReactNative.Managed.CodeGen.UnitTests/.*
+.*/node_modules/react-native-windows/Microsoft.ReactNative.Managed.UnitTests/.*
+
 ; These files dont need to be checked and just increase the build time
+.*/node_modules/e2etest/.*
 .*/node_modules/microsoft-reactnative-sampleapps/.*
+.*/node_modules/playground/.*
 
 ; Ignore templates for 'react-native init'
 <PROJECT_ROOT>/template/.*
@@ -109,8 +115,6 @@ deprecated-type=warn
 unsafe-getters-setters=warn
 unnecessary-invariant=warn
 signature-verification-failure=warn
-deprecated-utility=error
-unsafe-addition=error
 
 [strict]
 deprecated-type
@@ -122,4 +126,4 @@ untyped-import
 untyped-type-import
 
 [version]
-^0.128.0
+^0.132.0

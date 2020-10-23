@@ -7,6 +7,7 @@
 #include "TouchEventHandler.h"
 
 #include <Modules/NativeUIManager.h>
+#include <Modules/PaperUIManagerModule.h>
 #include <UI.Xaml.Controls.h>
 #include <UI.Xaml.Documents.h>
 #include <UI.Xaml.Input.h>
@@ -23,12 +24,12 @@
 #include <winrt/Microsoft.UI.Input2.Experimental.h>
 #endif
 
-namespace react::uwp {
+namespace Microsoft::ReactNative {
 
-std::vector<int64_t> GetTagsForBranch(facebook::react::INativeUIManagerHost *host, int64_t tag);
+std::vector<int64_t> GetTagsForBranch(INativeUIManagerHost *host, int64_t tag);
 
-TouchEventHandler::TouchEventHandler(const std::weak_ptr<IReactInstance> &reactInstance)
-    : m_xamlView(nullptr), m_wkReactInstance(reactInstance) {}
+TouchEventHandler::TouchEventHandler(const Mso::React::IReactContext &context)
+    : m_xamlView(nullptr), m_context(&context) {}
 
 TouchEventHandler::~TouchEventHandler() {
   RemoveTouchHandlers();
@@ -67,8 +68,7 @@ void TouchEventHandler::OnPointerPressed(
     const winrt::IInspectable & /*sender*/,
     const winrt::PointerRoutedEventArgs &args) {
   // Short circuit all of this if we are in an error state
-  auto instance = m_wkReactInstance.lock();
-  if (!instance || instance->IsInError())
+  if (m_context->State() == Mso::React::ReactInstanceState::HasError)
     return;
 
   if (IndexOfPointerWithId(args.Pointer().PointerId()) != std::nullopt) {
@@ -92,7 +92,7 @@ void TouchEventHandler::OnPointerPressed(
 
   if (m_xamlView.as<xaml::FrameworkElement>().CapturePointer(args.Pointer())) {
     // Pointer pressing updates the enter/leave state
-    UpdatePointersInViews(instance, args, tag, sourceElement);
+    UpdatePointersInViews(args, tag, sourceElement);
 
     size_t pointerIndex = AddReactPointer(args, tag, sourceElement);
 
@@ -126,19 +126,17 @@ void TouchEventHandler::OnPointerExited(
     const winrt::IInspectable & /*sender*/,
     const winrt::PointerRoutedEventArgs &args) {
   // Short circuit all of this if we are in an error state
-  auto instance = m_wkReactInstance.lock();
-  if (!instance || instance->IsInError())
+  if (m_context->State() == Mso::React::ReactInstanceState::HasError)
     return;
 
-  UpdatePointersInViews(instance, args, -1, nullptr);
+  UpdatePointersInViews(args, -1, nullptr);
 }
 
 void TouchEventHandler::OnPointerMoved(
     const winrt::IInspectable & /*sender*/,
     const winrt::PointerRoutedEventArgs &args) {
   // Short circuit all of this if we are in an error state
-  auto instance = m_wkReactInstance.lock();
-  if (!instance || instance->IsInError())
+  if (m_context->State() == Mso::React::ReactInstanceState::HasError)
     return;
 
   // Only if the view has a Tag can we process this
@@ -153,14 +151,13 @@ void TouchEventHandler::OnPointerMoved(
     DispatchTouchEvent(TouchEventType::Move, *optPointerIndex);
   } else {
     // Move with no buttons pressed
-    UpdatePointersInViews(instance, args, tag, sourceElement);
+    UpdatePointersInViews(args, tag, sourceElement);
   }
 }
 
 void TouchEventHandler::OnPointerConcluded(TouchEventType eventType, const winrt::PointerRoutedEventArgs &args) {
   // Short circuit all of this if we are in an error state
-  auto instance = m_wkReactInstance.lock();
-  if (!instance || instance->IsInError())
+  if (m_context->State() == Mso::React::ReactInstanceState::HasError)
     return;
 
   auto optPointerIndex = IndexOfPointerWithId(args.Pointer().PointerId());
@@ -252,76 +249,76 @@ std::optional<size_t> TouchEventHandler::IndexOfPointerWithId(uint32_t pointerId
 }
 
 void TouchEventHandler::UpdatePointersInViews(
-    std::shared_ptr<IReactInstance> instance,
     const winrt::PointerRoutedEventArgs &args,
     int64_t tag,
     xaml::UIElement sourceElement) {
-  auto nativeUiManager = static_cast<NativeUIManager *>(instance->NativeUIManager());
-  auto puiManagerHost = nativeUiManager->getHost();
-  int32_t pointerId = args.Pointer().PointerId();
+  if (auto nativeUiManager = GetNativeUIManager(*m_context).lock()) {
+    auto puiManagerHost = nativeUiManager->getHost();
+    int32_t pointerId = args.Pointer().PointerId();
 
-  // m_pointers is tracking the pointers that are 'down', for moves we usually
-  // don't have any pointers down and should reset the touchId back to zero
-  if (m_pointers.size() == 0)
-    m_touchId = 0;
+    // m_pointers is tracking the pointers that are 'down', for moves we usually
+    // don't have any pointers down and should reset the touchId back to zero
+    if (m_pointers.size() == 0)
+      m_touchId = 0;
 
-  // Get the branch of views under the pointer in leaf to root order
-  std::vector<int64_t> newViews;
-  if (tag != -1)
-    newViews = GetTagsForBranch(puiManagerHost, tag);
+    // Get the branch of views under the pointer in leaf to root order
+    std::vector<int64_t> newViews;
+    if (tag != -1)
+      newViews = GetTagsForBranch(puiManagerHost, tag);
 
-  // Get the results of the last time we calculated the path
-  auto it = m_pointersInViews.find(pointerId);
-  TagSet *existingViews;
-  if (it != m_pointersInViews.end()) {
-    existingViews = &it->second;
-  } else {
-    existingViews = nullptr;
-  }
+    // Get the results of the last time we calculated the path
+    auto it = m_pointersInViews.find(pointerId);
+    TagSet *existingViews;
+    if (it != m_pointersInViews.end()) {
+      existingViews = &it->second;
+    } else {
+      existingViews = nullptr;
+    }
 
-  // Short-circuit if the hierarchy hasn't changed
-  if ((existingViews == nullptr && newViews.size() == 0) ||
-      (existingViews != nullptr && existingViews->orderedTags == newViews))
-    return;
+    // Short-circuit if the hierarchy hasn't changed
+    if ((existingViews == nullptr && newViews.size() == 0) ||
+        (existingViews != nullptr && existingViews->orderedTags == newViews))
+      return;
 
-  // Prep to fire pointer events
-  std::unordered_set<int64_t> newViewsSet(newViews.begin(), newViews.end());
-  ReactPointer pointer;
+    // Prep to fire pointer events
+    std::unordered_set<int64_t> newViewsSet(newViews.begin(), newViews.end());
+    ReactPointer pointer;
 
-  auto optPointerIndex = IndexOfPointerWithId(pointerId);
-  if (optPointerIndex) {
-    pointer = m_pointers[*optPointerIndex];
-    UpdateReactPointer(pointer, args, sourceElement);
-  } else {
-    pointer = CreateReactPointer(args, tag, sourceElement);
-  }
+    auto optPointerIndex = IndexOfPointerWithId(pointerId);
+    if (optPointerIndex) {
+      pointer = m_pointers[*optPointerIndex];
+      UpdateReactPointer(pointer, args, sourceElement);
+    } else {
+      pointer = CreateReactPointer(args, tag, sourceElement);
+    }
 
-  // Walk through existingViews from innermost to outer, firing mouseLeave events if they are not in newViews
-  if (existingViews) {
-    for (int64_t existingTag : existingViews->orderedTags) {
-      if (newViewsSet.count(existingTag)) {
+    // Walk through existingViews from innermost to outer, firing mouseLeave events if they are not in newViews
+    if (existingViews) {
+      for (int64_t existingTag : existingViews->orderedTags) {
+        if (newViewsSet.count(existingTag)) {
+          continue;
+        }
+
+        ShadowNodeBase *node = static_cast<ShadowNodeBase *>(puiManagerHost->FindShadowNodeForTag(existingTag));
+        if (node != nullptr && node->m_onMouseLeaveRegistered)
+          m_context->DispatchEvent(existingTag, "topMouseLeave", GetPointerJson(pointer, existingTag));
+      }
+    }
+
+    // Walk through newViews from outermost to inner, firing mouseEnter events if they are not in existingViews
+    for (auto iter = newViews.rbegin(); iter != newViews.rend(); ++iter) {
+      int64_t newTag = *iter;
+      if (existingViews && existingViews->tags.count(newTag)) {
         continue;
       }
 
-      ShadowNodeBase *node = static_cast<ShadowNodeBase *>(puiManagerHost->FindShadowNodeForTag(existingTag));
-      if (node != nullptr && node->m_onMouseLeaveRegistered)
-        instance->DispatchEvent(existingTag, "topMouseLeave", GetPointerJson(pointer, existingTag));
-    }
-  }
-
-  // Walk through newViews from outermost to inner, firing mouseEnter events if they are not in existingViews
-  for (auto iter = newViews.rbegin(); iter != newViews.rend(); ++iter) {
-    int64_t newTag = *iter;
-    if (existingViews && existingViews->tags.count(newTag)) {
-      continue;
+      ShadowNodeBase *node = static_cast<ShadowNodeBase *>(puiManagerHost->FindShadowNodeForTag(newTag));
+      if (node != nullptr && node->m_onMouseEnterRegistered)
+        m_context->DispatchEvent(newTag, "topMouseEnter", GetPointerJson(pointer, newTag));
     }
 
-    ShadowNodeBase *node = static_cast<ShadowNodeBase *>(puiManagerHost->FindShadowNodeForTag(newTag));
-    if (node != nullptr && node->m_onMouseEnterRegistered)
-      instance->DispatchEvent(newTag, "topMouseEnter", GetPointerJson(pointer, newTag));
+    m_pointersInViews[pointerId] = {std::move(newViewsSet), std::move(newViews)};
   }
-
-  m_pointersInViews[pointerId] = {std::move(newViewsSet), std::move(newViews)};
 }
 
 folly::dynamic TouchEventHandler::GetPointerJson(const ReactPointer &pointer, int64_t target) {
@@ -352,18 +349,15 @@ void TouchEventHandler::DispatchTouchEvent(TouchEventType eventType, size_t poin
     return;
   folly::dynamic params = folly::dynamic::array(eventName, std::move(touches), std::move(changedIndices));
 
-  auto instance = m_wkReactInstance.lock();
-  instance->CallJsFunction("RCTEventEmitter", "receiveTouches", std::move(params));
+  m_context->CallJSFunction("RCTEventEmitter", "receiveTouches", std::move(params));
 }
 
 bool TouchEventHandler::DispatchBackEvent() {
-  auto instance = m_wkReactInstance.lock();
-  if (instance != nullptr && !instance->IsInError()) {
-    instance->CallJsFunction("RCTDeviceEventEmitter", "emit", folly::dynamic::array("hardwareBackPress"));
-    return true;
-  }
+  if (m_context->State() != Mso::React::ReactInstanceState::Loaded)
+    return false;
 
-  return false;
+  m_context->CallJSFunction("RCTDeviceEventEmitter", "emit", folly::dynamic::array("hardwareBackPress"));
+  return true;
 }
 
 const char *TouchEventHandler::GetPointerDeviceTypeName(
@@ -505,7 +499,7 @@ winrt::IPropertyValue TouchEventHandler::TestHit(
 // Retreives the path of nodes from an element to the root.
 // The order of the returned list is from child to parent.
 //
-std::vector<int64_t> GetTagsForBranch(facebook::react::INativeUIManagerHost *host, int64_t tag) {
+std::vector<int64_t> GetTagsForBranch(INativeUIManagerHost *host, int64_t tag) {
   std::vector<int64_t> tags;
 
   auto *shadowNode = host->FindShadowNodeForTag(tag);
@@ -519,4 +513,4 @@ std::vector<int64_t> GetTagsForBranch(facebook::react::INativeUIManagerHost *hos
   return tags;
 }
 
-} // namespace react::uwp
+} // namespace Microsoft::ReactNative

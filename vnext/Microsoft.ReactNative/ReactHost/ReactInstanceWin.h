@@ -13,7 +13,7 @@
 #include <Modules/AppThemeModuleUwp.h>
 #include <Modules/AppearanceModule.h>
 #include <Modules/I18nManagerModule.h>
-#include "UwpReactInstanceProxy.h"
+#include <Views/ExpressionAnimationStore.h>
 #endif
 
 #include <tuple>
@@ -41,41 +41,47 @@ static_assert(
     static_cast<int32_t>(facebook::react::RCTLogLevel::Fatal) == static_cast<int32_t>(LogLevel::Fatal),
     "LogLevel::Fatal value must match");
 
+struct BridgeUIBatchInstanceCallback;
+
 //! ReactInstance implementation for Windows that is managed by ReactHost.
-class ReactInstanceWin final : public Mso::ActiveObject<IReactInstanceInternal, ILegacyReactInstance> {
+class ReactInstanceWin final : public Mso::ActiveObject<IReactInstanceInternal> {
   using Super = ActiveObjectType;
+  friend BridgeUIBatchInstanceCallback;
 
  public: // IReactInstance
   const ReactOptions &Options() const noexcept override;
   ReactInstanceState State() const noexcept override;
-
- public: // IReactInstanceInternal
-  Mso::Future<void> Destroy() noexcept override;
-
- public: // ILegacyReactInstance
-  void CallJsFunction(std::string &&moduleName, std::string &&method, folly::dynamic &&params) noexcept override;
-  void DispatchEvent(int64_t viewTag, std::string &&eventName, folly::dynamic &&eventData) noexcept override;
-#ifndef CORE_ABI
-  facebook::react::INativeUIManager *NativeUIManager() noexcept override;
-#endif
-  std::shared_ptr<facebook::react::Instance> GetInnerInstance() noexcept override;
-  std::string GetBundleRootPath() noexcept override;
-#ifndef CORE_ABI
-  std::shared_ptr<react::uwp::IReactInstance> UwpReactInstance() noexcept override;
-#endif
-  bool IsLoaded() const noexcept override;
-#ifndef CORE_ABI
+  Mso::React::IReactContext &GetReactContext() const noexcept override;
   void AttachMeasuredRootView(
       facebook::react::IReactRootView *rootView,
       folly::dynamic &&initialProps) noexcept override;
   void DetachRootView(facebook::react::IReactRootView *rootView) noexcept override;
+
+ public: // IReactInstanceInternal
+  Mso::Future<void> Destroy() noexcept override;
+
+ public:
+  void CallJsFunction(std::string &&moduleName, std::string &&method, folly::dynamic &&params) noexcept;
+  void DispatchEvent(int64_t viewTag, std::string &&eventName, folly::dynamic &&eventData) noexcept;
+  std::shared_ptr<facebook::react::Instance> GetInnerInstance() noexcept;
+  bool IsLoaded() const noexcept;
+#ifndef CORE_ABI
+
+  bool UseWebDebugger() const noexcept;
+  bool UseFastRefresh() const noexcept;
+  bool UseDirectDebugger() const noexcept;
+  bool DebuggerBreakOnNextLine() const noexcept;
+  uint16_t DebuggerPort() const noexcept;
+  std::string DebugBundlePath() const noexcept;
+  std::string BundleRootPath() const noexcept;
+  std::string SourceBundleHost() const noexcept;
+  uint16_t SourceBundlePort() const noexcept;
+  std::string JavaScriptBundleFile() const noexcept;
+  bool UseDeveloperSupport() const noexcept;
 #endif
 
  private:
   friend MakePolicy;
-  // UwpReactInstance(
-  //    const std::shared_ptr<facebook::react::NativeModuleProvider> &moduleProvider,
-  //    const std::shared_ptr<ViewManagerProvider> &viewManagerProvider = nullptr);
   ReactInstanceWin(
       IReactHost &reactHost,
       ReactOptions const &options,
@@ -130,9 +136,7 @@ class ReactInstanceWin final : public Mso::ActiveObject<IReactInstanceInternal, 
   const Mso::Promise<void> m_whenCreated;
   const Mso::Promise<void> m_whenLoaded;
   const Mso::Promise<void> m_whenDestroyed;
-#ifndef CORE_ABI
-  const std::shared_ptr<react::uwp::UwpReactInstanceProxy> m_legacyInstance;
-#endif
+
   const Mso::VoidFunctor m_updateUI;
   const bool m_debuggerBreakOnNextLine : 1;
   const bool m_isFastReloadEnabled : 1;
@@ -157,7 +161,6 @@ class ReactInstanceWin final : public Mso::ActiveObject<IReactInstanceInternal, 
                                                                                                              m_mutex};
   const Mso::ActiveReadableField<std::shared_ptr<facebook::react::MessageQueueThread>> m_uiMessageThread{Queue(),
                                                                                                          m_mutex};
-  const Mso::ActiveReadableField<std::shared_ptr<facebook::react::IUIManager>> m_uiManager{Queue(), m_mutex};
 
   const Mso::ActiveReadableField<std::shared_ptr<facebook::react::InstanceWrapper>> m_instanceWrapper{Queue(), m_mutex};
   const Mso::ActiveReadableField<std::shared_ptr<facebook::react::Instance>> m_instance{Queue(), m_mutex};
@@ -165,13 +168,11 @@ class ReactInstanceWin final : public Mso::ActiveObject<IReactInstanceInternal, 
 
   std::shared_ptr<facebook::react::MessageQueueThread> m_batchingUIThread;
 
-  std::shared_ptr<react::uwp::IReactInstance> m_legacyReactInstance;
   std::shared_ptr<IRedBoxHandler> m_redboxHandler;
 #ifndef CORE_ABI
   std::shared_ptr<react::uwp::AppTheme> m_appTheme;
   Mso::CntPtr<react::uwp::AppearanceChangeListener> m_appearanceListener;
 #endif
-  std::string m_bundleRootPath;
   Mso::DispatchQueue m_uiQueue;
   std::deque<JSCallEntry> m_jsCallQueue;
 };

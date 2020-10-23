@@ -5,17 +5,17 @@
 
 #include <Views/ControlViewManager.h>
 
-namespace react::uwp {
+namespace Microsoft::ReactNative {
 
 class DatePickerViewManager : public ControlViewManager {
   using Super = ControlViewManager;
 
  public:
-  DatePickerViewManager(const std::shared_ptr<IReactInstance> &reactInstance);
+  DatePickerViewManager(const Mso::React::IReactContext &context);
 
-  facebook::react::ShadowNode *createShadow() const;
-  const char *GetName() const override;
-  folly::dynamic GetNativeProps() const override;
+  ShadowNode *createShadow() const;
+  const wchar_t *GetName() const override;
+  void GetNativeProps(const winrt::Microsoft::ReactNative::IJSValueWriter &writer) const override;
 
   YGMeasureFunc GetYogaCustomMeasureFunc() const override;
 
@@ -25,4 +25,4 @@ class DatePickerViewManager : public ControlViewManager {
   friend class DatePickerShadowNode;
 };
 
-} // namespace react::uwp
+} // namespace Microsoft::ReactNative

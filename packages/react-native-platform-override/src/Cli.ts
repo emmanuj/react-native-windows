@@ -7,18 +7,18 @@
 
 import * as Api from './Api';
 
-import * as _ from 'lodash';
 import * as chalk from 'chalk';
 import * as ora from 'ora';
 import * as path from 'path';
 import * as yargs from 'yargs';
 
+import {findAllManifests, findManifest} from './FileSearch';
 import {overrideFromDetails, promptForOverrideDetails} from './OverridePrompt';
 
 import CrossProcessLock from './CrossProcessLock';
+import GitReactFileRepository from './GitReactFileRepository';
 import {UpgradeResult} from './UpgradeStrategy';
 import {ValidationError} from './ValidationStrategy';
-import {findManifest} from './FileSearch';
 import {getNpmPackage} from './PackageUtils';
 
 void doMain(async () => {
@@ -42,7 +42,7 @@ void doMain(async () => {
           }),
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         cmdArgv =>
-          validateManifest({
+          validateManifests({
             manifestPath: cmdArgv.manifest,
             reactNativeVersion: cmdArgv.version,
           }),
@@ -66,6 +66,16 @@ void doMain(async () => {
           }),
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         cmdArgv => removeOverride(cmdArgv.override!),
+      )
+      .command(
+        'diff <override>',
+        'Compares an override to the base file of its current version',
+        cmdYargs =>
+          cmdYargs.options({
+            override: {type: 'string', describe: 'The override to add'},
+          }),
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        cmdArgv => diffOverride(cmdArgv.override!),
       )
       .command(
         'upgrade',
@@ -96,6 +106,15 @@ void doMain(async () => {
       )
       .epilogue(npmPackage.description)
       .option('color', {hidden: true})
+      .option('githubToken', {
+        description: 'Optional PAT to use for GitHub API calls',
+        type: 'string',
+      })
+      .middleware(argv => {
+        if (argv.githubToken) {
+          GitReactFileRepository.setGithubToken(argv.githubToken);
+        }
+      })
       .demandCommand()
       .recommendCommands()
       .strict()
@@ -111,20 +130,38 @@ void doMain(async () => {
  * Check that the given manifest correctly describe overrides and that all
  * overrides are up to date
  */
-async function validateManifest(opts: {
+async function validateManifests(opts: {
   manifestPath?: string;
   reactNativeVersion?: string;
 }) {
-  const spinner = ora(`Validating overrides`).start();
+  const manifests = opts.manifestPath
+    ? [opts.manifestPath]
+    : await enumerateManifests();
 
+  const spinner = ora();
   await spinnerGuard(spinner, async () => {
-    const validationErrors = await Api.validateManifest(opts);
+    // Perform validation sequentially because validation has internal
+    // concurrency
+    const allManifestErrors = [];
+    for (const manifest of manifests) {
+      spinner.text = `Validating ${manifest}`;
+      spinner.start();
 
-    if (validationErrors.length === 0) {
+      const errors = await Api.validateManifest(manifest, opts);
+      if (errors.length !== 0) {
+        allManifestErrors.push({manifest, errors});
+      }
+    }
+
+    if (allManifestErrors.length === 0) {
+      spinner.text = 'Validation succeeded';
       spinner.succeed();
     } else {
+      spinner.text = 'Validation failed';
       spinner.fail();
-      await printValidationErrors(validationErrors);
+      for (const manifestErrors of allManifestErrors) {
+        await printValidationErrors(manifestErrors);
+      }
       process.exitCode = 1;
     }
   });
@@ -138,7 +175,7 @@ async function addOverride(overridePath: string) {
   const manifestDir = path.dirname(manifestPath);
   const overrideName = path.relative(manifestDir, path.resolve(overridePath));
 
-  if (await Api.hasOverride(overrideName, {manifestPath})) {
+  if (await Api.hasOverride(overrideName, manifestPath)) {
     console.warn(
       chalk.yellow(
         'Warning: override already exists in manifest and will be overwritten',
@@ -153,11 +190,11 @@ async function addOverride(overridePath: string) {
     const override = await overrideFromDetails(
       overridePath,
       overrideDetails,
-      await Api.getOverrideFactory({manifestPath}),
+      await Api.getOverrideFactory(manifestPath),
     );
 
-    await Api.removeOverride(overrideName, {manifestPath});
-    await Api.addOverride(override, {manifestPath});
+    await Api.removeOverride(overrideName, manifestPath);
+    await Api.addOverride(override, manifestPath);
     spinner.succeed();
   });
 }
@@ -170,7 +207,7 @@ async function removeOverride(overridePath: string) {
   const manifestDir = path.dirname(manifestPath);
   const overrideName = path.relative(manifestDir, path.resolve(overridePath));
 
-  if (await Api.removeOverride(overrideName, {manifestPath})) {
+  if (await Api.removeOverride(overrideName, manifestPath)) {
     console.log(chalk.greenBright('Override successfully removed'));
   } else {
     console.error(
@@ -178,6 +215,29 @@ async function removeOverride(overridePath: string) {
     );
     process.exit(1);
   }
+}
+
+/**
+ * Diffs an override against its base file
+ */
+async function diffOverride(overridePath: string) {
+  const manifestPath = await findManifest(path.dirname(overridePath));
+  const manifestDir = path.dirname(manifestPath);
+  const overrideName = path.relative(manifestDir, path.resolve(overridePath));
+  const diff = await Api.diffOverride(overrideName, manifestPath);
+
+  const colorizedDiff = diff
+    .split('\n')
+    .map(line =>
+      line.startsWith('+')
+        ? chalk.green(line)
+        : line.startsWith('-')
+        ? chalk.red(line)
+        : line,
+    )
+    .join('\n');
+
+  console.log(colorizedDiff);
 }
 
 /**
@@ -189,12 +249,28 @@ async function upgrade(opts: {
   reactNativeVersion?: string;
   allowConflicts: boolean;
 }) {
-  const spinner = ora('Merging overrides').start();
+  const manifests = opts.manifestPath
+    ? [opts.manifestPath]
+    : await enumerateManifests();
+
+  for (const manifest of manifests) {
+    await upgradeManifest(manifest, opts);
+  }
+}
+
+async function upgradeManifest(
+  manifestPath: string,
+  opts: {
+    reactNativeVersion?: string;
+    allowConflicts: boolean;
+  },
+) {
+  const spinner = ora(`Merging overrides in ${manifestPath}`).start();
   await spinnerGuard(spinner, async () => {
-    const upgradeResults = await Api.upgradeOverrides({
+    const upgradeResults = await Api.upgradeOverrides(manifestPath, {
       ...opts,
       progressListener: (currentOverride, totalOverrides) =>
-        (spinner.text = `Merging overrides (${currentOverride}/${totalOverrides})`),
+        (spinner.text = `Merging overrides in ${manifestPath} (${currentOverride}/${totalOverrides})`),
     });
 
     spinner.succeed();
@@ -232,76 +308,66 @@ function printUpgradeStats(
 /**
  * Prints validation errors in a user-readable form to stderr
  */
-async function printValidationErrors(validationErrors: Array<ValidationError>) {
-  if (validationErrors.length === 0) {
+async function printValidationErrors(manifestErrors: {
+  manifest: string;
+  errors: ValidationError[];
+}) {
+  if (Object.keys(manifestErrors).length === 0) {
     return;
   }
 
   const npmPackage = await getNpmPackage();
-  const errors = _.clone(validationErrors);
 
   // Add an initial line of separation
   console.error();
 
   printErrorType(
     'missingFromManifest',
-    errors,
-    `Found override files that aren't listed in the manifest. Overrides can be added to the manifest by using 'npx ${
-      npmPackage.name
-    } add <override>':`,
+    manifestErrors,
+    `Found override files that aren't listed in the manifest. Overrides can be added to the manifest by using 'npx ${npmPackage.name} add <override>':`,
   );
 
   printErrorType(
     'overrideNotFound',
-    errors,
-    `Found overrides in the manifest that don't exist on disk. Remove existing overrides using 'npx ${
-      npmPackage.name
-    } remove <override>':`,
+    manifestErrors,
+    `Found overrides in the manifest that don't exist on disk. Remove existing overrides using 'npx ${npmPackage.name} remove <override>':`,
   );
 
   printErrorType(
     'baseNotFound',
-    errors,
-    `Found overrides whose base files do not exist. Remove existing overrides using 'npx ${
-      npmPackage.name
-    } remove <override>':`,
+    manifestErrors,
+    `Found overrides whose base files do not exist. Remove existing overrides using 'npx ${npmPackage.name} remove <override>':`,
   );
 
   printErrorType(
     'outOfDate',
-    errors,
-    `Found overrides whose original files have changed. Upgrade overrides using 'npx ${
-      npmPackage.name
-    } upgrade:`,
+    manifestErrors,
+    `Found overrides whose original files have changed. Upgrade overrides using 'npx ${npmPackage.name} upgrade':`,
   );
 
   printErrorType(
     'overrideDifferentFromBase',
-    errors,
+    manifestErrors,
     'The following overrides should be an exact copy of their base files. Ensure overrides are up to date or revert changes:',
   );
 
   printErrorType(
     'overrideSameAsBase',
-    errors,
+    manifestErrors,
     'The following overrides are identical to their base files. Please remove them or set their type to "copy":',
   );
 
   printErrorType(
     'expectedFile',
-    errors,
+    manifestErrors,
     'The following overrides should operate on files, but list directories:',
   );
 
   printErrorType(
     'expectedDirectory',
-    errors,
+    manifestErrors,
     'The following overrides should operate on directories, but listed files:',
   );
-
-  if (errors.length !== 0) {
-    throw new Error('Unprinted errors present:\n' + errors);
-  }
 }
 
 /**
@@ -309,17 +375,22 @@ async function printValidationErrors(validationErrors: Array<ValidationError>) {
  */
 function printErrorType(
   type: ValidationError['type'],
-  errors: ValidationError[],
+  manifestErrors: {manifest: string; errors: ValidationError[]},
   message: string,
 ) {
-  const filteredErrors = _.remove(errors, err => err.type === type);
+  const filteredErrors = manifestErrors.errors.filter(err => err.type === type);
   filteredErrors.sort((a, b) =>
     a.overrideName.localeCompare(b.overrideName, 'en'),
   );
 
   if (filteredErrors.length > 0) {
     console.error(chalk.red(message));
-    filteredErrors.forEach(err => console.error(` - ${err.overrideName}`));
+    filteredErrors.forEach(err => {
+      const longOverrideName = path.resolve(
+        path.join(path.dirname(manifestErrors.manifest), err.overrideName),
+      );
+      console.error(` - ${longOverrideName}`);
+    });
     console.error();
   }
 }
@@ -360,4 +431,18 @@ async function doMain(fn: () => Promise<void>): Promise<void> {
 
   await fn();
   await lock.unlock();
+}
+
+/**
+ * Check that a manifest exists, and return all that are found
+ */
+async function enumerateManifests(): Promise<string[]> {
+  const manifests = await findAllManifests();
+  if (manifests.length === 0) {
+    throw new Error(
+      'No override manifests were found relative to the current directory',
+    );
+  }
+
+  return manifests;
 }

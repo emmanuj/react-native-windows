@@ -8,6 +8,7 @@
 #include <Utils/Helpers.h>
 #include <winrt/Windows.Foundation.Metadata.h>
 
+#include <Modules/PaperUIManagerModule.h>
 #include <appmodel.h>
 #include <processthreadsapi.h>
 
@@ -29,12 +30,12 @@ namespace react::uwp {
 // </NavigationView>
 // Instead of deduce view id directly from FrameworkElement.Tag, this do
 // additional check by uimanager.
-ReactId getViewId(_In_ IReactInstance *instance, xaml::FrameworkElement const &fe) {
+ReactId getViewId(const Mso::React::IReactContext &context, xaml::FrameworkElement const &fe) {
   ReactId reactId;
-  if (auto uiManager = static_cast<NativeUIManager *>(instance->NativeUIManager())) {
+  if (auto uiManager = Microsoft::ReactNative::GetNativeUIManager(context).lock()) {
     if (auto peer = uiManager->reactPeerOrContainerFrom(fe)) {
       reactId.isValid = true;
-      reactId.tag = GetTag(peer);
+      reactId.tag = Microsoft::ReactNative::GetTag(peer);
     }
   }
   return reactId;

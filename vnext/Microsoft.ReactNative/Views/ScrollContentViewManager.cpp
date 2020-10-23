@@ -5,13 +5,12 @@
 
 #include "ScrollContentViewManager.h"
 
-namespace react::uwp {
+namespace Microsoft::ReactNative {
 
-ScrollContentViewManager::ScrollContentViewManager(const std::shared_ptr<IReactInstance> &reactInstance)
-    : Super(reactInstance) {}
+ScrollContentViewManager::ScrollContentViewManager(const Mso::React::IReactContext &context) : Super(context) {}
 
-const char *ScrollContentViewManager::GetName() const {
-  return "RCTScrollContentView";
+const wchar_t *ScrollContentViewManager::GetName() const {
+  return L"RCTScrollContentView";
 }
 
-} // namespace react::uwp
+} // namespace Microsoft::ReactNative

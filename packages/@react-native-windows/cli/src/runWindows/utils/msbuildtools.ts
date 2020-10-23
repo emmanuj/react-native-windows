@@ -118,7 +118,8 @@ export default class MSBuildTools {
       console.log(`Running MSBuild with args ${args.join(' ')}`);
     }
 
-    const progressName = 'Building Solution';
+    const progressName =
+      target === 'Deploy' ? 'Deploying Solution' : 'Building Solution';
     const spinner = newSpinner(progressName);
     try {
       await commandWithProgress(
@@ -166,9 +167,7 @@ export default class MSBuildTools {
     if (!vsInstallation) {
       if (process.env.VisualStudioVersion != null) {
         throw new Error(
-          `MSBuild tools not found for version ${
-            process.env.VisualStudioVersion
-          } (from environment). Make sure all required components have been installed`,
+          `MSBuild tools not found for version ${process.env.VisualStudioVersion} (from environment). Make sure all required components have been installed`,
         );
       } else {
         throw new Error(
@@ -184,9 +183,7 @@ export default class MSBuildTools {
 
     if (fs.existsSync(toolsPath)) {
       newSuccess(
-        `Found MSBuild v${version} at ${toolsPath} (${
-          vsInstallation.installationVersion
-        })`,
+        `Found MSBuild v${version} at ${toolsPath} (${vsInstallation.installationVersion})`,
       );
       return new MSBuildTools(
         version,

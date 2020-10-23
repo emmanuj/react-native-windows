@@ -10,6 +10,7 @@ import * as Serialized from '../Serialized';
 
 import * as ora from 'ora';
 import * as path from 'path';
+import * as yargs from 'yargs';
 
 import FileSystemRepository from '../FileSystemRepository';
 import GitReactFileRepository from '../GitReactFileRepository';
@@ -19,22 +20,34 @@ import {getInstalledRNVersion} from '../PackageUtils';
 import {hashContent} from '../Hash';
 import isutf8 from 'isutf8';
 
-const WIN_PLATFORM_EXT = /\.win32|\.windows|\.windesktop/;
+const {extensions, directory} = yargs
+  .options({
+    directory: {
+      description:
+        'The directory containing files that should be in the manifest',
+      type: 'string',
+      demandOption: true,
+    },
+    extensions: {
+      description: 'A list of platform specific JS extensions to include',
+      type: 'array',
+      demandOption: true,
+    },
+  })
+  .version(false).argv;
+
+const extensionsRegex = new RegExp(extensions.map(e => `\\.${e}`).join('|'));
 
 (async () => {
-  const ovrPath = process.argv[2];
-  if (!ovrPath) {
-    throw new Error('Expected ovrPath to be provided');
-  }
-
   const spinner = ora();
   spinner.start('Creating manifest');
 
   const version = await getInstalledRNVersion();
-  const [overrides, reactSources] = await getFileRepos(ovrPath, version);
+  const [overrides, reactSources] = await getFileRepos(directory, version);
   const manifest: Serialized.Manifest = {
     includePatterns: undefined,
     excludePatterns: undefined,
+    baseVersion: version,
     overrides: [],
   };
   const overrideFiles = await overrides.listFiles();
@@ -44,13 +57,13 @@ const WIN_PLATFORM_EXT = /\.win32|\.windows|\.windesktop/;
     spinner.text = `Creating manifest (${++i}/${overrideFiles.length})`;
 
     const contents = (await overrides.readFile(file))!;
-    (await tryAddCopy(file, version, contents, reactSources, manifest)) ||
-      (await tryAddPatch(file, version, contents, reactSources, manifest)) ||
-      (await tryAddDerived(file, version, contents, reactSources, manifest)) ||
-      addUnknown(file, version, manifest);
+    (await tryAddCopy(file, contents, reactSources, manifest)) ||
+      (await tryAddPatch(file, contents, reactSources, manifest)) ||
+      (await tryAddDerived(file, contents, reactSources, manifest)) ||
+      addUnknown(file, manifest);
   }
 
-  const ovrFile = path.join(ovrPath, 'overrides.json');
+  const ovrFile = path.join(directory, 'overrides.json');
   await Serialized.writeManifestToFile(manifest, ovrFile);
 
   spinner.succeed();
@@ -58,7 +71,6 @@ const WIN_PLATFORM_EXT = /\.win32|\.windows|\.windesktop/;
 
 async function tryAddCopy(
   filename: string,
-  rnVersion: string,
   overrideContent: Buffer,
   reactSources: FileRepository.ReactFileRepository,
   manifest: Serialized.Manifest,
@@ -76,9 +88,9 @@ async function tryAddCopy(
     type: 'copy',
     file: filename,
     baseFile: filename,
-    baseVersion: rnVersion,
+    baseVersion: undefined,
     baseHash: hashContent(baseContent),
-    issue: 0,
+    issue: undefined,
   });
 
   return true;
@@ -86,12 +98,11 @@ async function tryAddCopy(
 
 async function tryAddPatch(
   filename: string,
-  rnVersion: string,
   overrideContent: Buffer,
   reactSources: FileRepository.ReactFileRepository,
   manifest: Serialized.Manifest,
 ): Promise<boolean> {
-  const baseFile = filename.replace(WIN_PLATFORM_EXT, '');
+  const baseFile = filename.replace(extensionsRegex, '');
   const baseContent = await reactSources.readFile(baseFile);
 
   if (!baseContent) {
@@ -104,12 +115,12 @@ async function tryAddPatch(
       type: 'patch',
       file: filename,
       baseFile: baseFile,
-      baseVersion: rnVersion,
+      baseVersion: undefined,
       baseHash: hashContent(baseContent),
-      issue: 'LEGACY_FIXME',
+      issue: undefined,
     });
   } else {
-    addUnknown(filename, rnVersion, manifest);
+    addUnknown(filename, manifest);
   }
 
   return true;
@@ -117,14 +128,13 @@ async function tryAddPatch(
 
 async function tryAddDerived(
   filename: string,
-  rnVersion: string,
   overrideContent: Buffer,
   reactSources: FileRepository.ReactFileRepository,
   manifest: Serialized.Manifest,
 ): Promise<boolean> {
   const matches: Array<{file: string; contents: Buffer; dist: number}> = [];
 
-  const droidFile = filename.replace(WIN_PLATFORM_EXT, '.android');
+  const droidFile = filename.replace(extensionsRegex, '.android');
   const droidContents = await reactSources.readFile(droidFile);
   const droidSim =
     droidContents && computeSimilarity(overrideContent, droidContents);
@@ -136,7 +146,7 @@ async function tryAddDerived(
     });
   }
 
-  const iosFile = filename.replace(WIN_PLATFORM_EXT, '.ios');
+  const iosFile = filename.replace(extensionsRegex, '.ios');
   const iosContents = await reactSources.readFile(iosFile);
   const iosSim = iosContents && computeSimilarity(overrideContent, iosContents);
   if (iosSim && iosSim.similar) {
@@ -156,26 +166,20 @@ async function tryAddDerived(
     type: 'derived',
     file: filename,
     baseFile: bestMatch.file,
-    baseVersion: rnVersion,
+    baseVersion: undefined,
     baseHash: hashContent(bestMatch.contents),
-    issue: 'LEGACY_FIXME',
+    issue: undefined,
   });
 
   return true;
 }
 
-function addUnknown(
-  filename: string,
-  rnVersion: string,
-  manifest: Serialized.Manifest,
-) {
+function addUnknown(filename: string, manifest: Serialized.Manifest) {
   (manifest.overrides as Array<any>).push({
     type: '???',
     file: filename,
     baseFile: '???',
-    baseVersion: rnVersion,
     baseHash: '???',
-    issue: 'LEGACY_FIXME',
   });
 }
 

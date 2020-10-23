@@ -6,14 +6,15 @@
  */
 
 import * as Serialized from './Serialized';
-
 import * as _ from 'lodash';
+import * as path from 'path';
 
 import Override, {deserializeOverride} from './Override';
 import {ReactFileRepository, WritableFileRepository} from './FileRepository';
 import OverrideFactory from './OverrideFactory';
 import {ValidationError} from './ValidationStrategy';
 import {eachLimit} from 'async';
+import {normalizePath} from './PathUtils';
 
 /**
  * Represents a collection of overrides listed in an on-disk manifest. Allows
@@ -22,6 +23,7 @@ import {eachLimit} from 'async';
 export default class Manifest {
   private includePatterns?: string[];
   private excludePatterns?: string[];
+  private baseVersion?: string;
   private overrides: Override[];
 
   /**
@@ -36,6 +38,7 @@ export default class Manifest {
     opts: {
       includePatterns?: string[];
       excludePatterns?: string[];
+      baseVersion?: string;
     } = {},
   ) {
     const uniquelyNamed = _.uniqBy(overrides, ovr => ovr.name());
@@ -45,14 +48,18 @@ export default class Manifest {
 
     this.includePatterns = opts.includePatterns;
     this.excludePatterns = opts.excludePatterns;
+    this.baseVersion = opts.baseVersion;
     this.overrides = _.clone(overrides);
   }
 
   static fromSerialized(man: Serialized.Manifest): Manifest {
-    const overrides = man.overrides.map(deserializeOverride);
+    const overrides = man.overrides.map(ovr =>
+      deserializeOverride(ovr, {defaultBaseVersion: man.baseVersion}),
+    );
     return new Manifest(overrides, {
       includePatterns: man.includePatterns,
       excludePatterns: man.excludePatterns,
+      baseVersion: man.baseVersion,
     });
   }
 
@@ -76,6 +83,7 @@ export default class Manifest {
     const missingFromManifest = overrideFiles.filter(
       file =>
         file !== 'overrides.json' &&
+        path.relative('node_modules', file).startsWith('..') &&
         !this.overrides.some(override => override.includesFile(file)),
     );
     for (const missingFile of missingFromManifest) {
@@ -111,7 +119,9 @@ export default class Manifest {
    * Whether the manifest contains a given override
    */
   hasOverride(overrideName: string): boolean {
-    return this.overrides.some(ovr => ovr.name() === overrideName);
+    return this.overrides.some(
+      ovr => ovr.name() === normalizePath(overrideName),
+    );
   }
 
   /**
@@ -164,9 +174,12 @@ export default class Manifest {
     return {
       includePatterns: this.includePatterns,
       excludePatterns: this.excludePatterns,
+      baseVersion: this.baseVersion,
       overrides: this.overrides
         .sort((a, b) => a.name().localeCompare(b.name(), 'en'))
-        .map(override => override.serialize()),
+        .map(override =>
+          override.serialize({defaultBaseVersion: this.baseVersion}),
+        ),
     };
   }
 
@@ -178,10 +191,19 @@ export default class Manifest {
   }
 
   /**
+   * Set the default baseVersion for the manifest
+   */
+  setBaseVersion(baseVersion?: string) {
+    this.baseVersion = baseVersion;
+  }
+
+  /**
    * Find the index to a given override.
    * @returns -1 if it cannot be found
    */
   private findOverrideIndex(overrideName: string): number {
-    return this.overrides.findIndex(ovr => ovr.name() === overrideName);
+    return this.overrides.findIndex(
+      ovr => ovr.name() === normalizePath(overrideName),
+    );
   }
 }

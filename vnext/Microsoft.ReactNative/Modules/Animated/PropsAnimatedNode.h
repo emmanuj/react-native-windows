@@ -3,19 +3,23 @@
 
 #pragma once
 #include <IReactInstance.h>
+#include <React.h>
 #include <folly/dynamic.h>
 #include "AnimatedNode.h"
 
 #include "FacadeType.h"
 
-namespace react::uwp {
+namespace Microsoft::ReactNative {
 struct ShadowNodeBase;
+}
+
+namespace react::uwp {
 class PropsAnimatedNode final : public AnimatedNode {
  public:
   PropsAnimatedNode(
       int64_t tag,
       const folly::dynamic &config,
-      const std::weak_ptr<IReactInstance> &instance,
+      const Mso::CntPtr<Mso::React::IReactContext> &context,
       const std::shared_ptr<NativeAnimatedNodeManager> &manager);
   void ConnectToView(int64_t viewTag);
   void DisconnectFromView(int64_t viewTag);
@@ -27,10 +31,10 @@ class PropsAnimatedNode final : public AnimatedNode {
 
  private:
   void MakeAnimation(int64_t valueNodeTag, FacadeType facadeType);
-  ShadowNodeBase *GetShadowNodeBase();
+  Microsoft::ReactNative::ShadowNodeBase *GetShadowNodeBase();
   xaml::UIElement GetUIElement();
 
-  std::weak_ptr<IReactInstance> m_instance{};
+  Mso::CntPtr<Mso::React::IReactContext> m_context{};
   std::map<std::string, int64_t> m_propMapping{};
   folly::dynamic m_propMap{};
 

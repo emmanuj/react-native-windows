@@ -23,13 +23,14 @@
 #include "FacadeType.h"
 
 #include <Modules/NativeUIManager.h>
+#include <Modules/PaperUIManagerModule.h>
 #include <Windows.Foundation.h>
 
 namespace react::uwp {
 void NativeAnimatedNodeManager::CreateAnimatedNode(
     int64_t tag,
     const folly::dynamic &config,
-    const std::weak_ptr<IReactInstance> &instance,
+    const Mso::CntPtr<Mso::React::IReactContext> &context,
     const std::shared_ptr<NativeAnimatedNodeManager> &manager) {
   if (m_transformNodes.count(tag) > 0 || m_propsNodes.count(tag) > 0 || m_styleNodes.count(tag) > 0 ||
       m_valueNodes.count(tag) > 0) {
@@ -47,7 +48,7 @@ void NativeAnimatedNodeManager::CreateAnimatedNode(
       break;
     }
     case AnimatedNodeType::Props: {
-      m_propsNodes.emplace(tag, std::make_unique<PropsAnimatedNode>(tag, config, instance, manager));
+      m_propsNodes.emplace(tag, std::make_unique<PropsAnimatedNode>(tag, config, context, manager));
       break;
     }
     case AnimatedNodeType::Interpolation: {
@@ -339,12 +340,12 @@ void NativeAnimatedNodeManager::ProcessDelayedPropsNodes() {
 
 void NativeAnimatedNodeManager::AddDelayedPropsNode(
     int64_t propsNodeTag,
-    const std::shared_ptr<IReactInstance> &instance) {
+    const Mso::CntPtr<Mso::React::IReactContext> &context) {
   m_delayedPropsNodes.push_back(propsNodeTag);
   if (m_delayedPropsNodes.size() <= 1) {
-    static_cast<NativeUIManager *>(instance->NativeUIManager())->AddBatchCompletedCallback([this]() {
-      ProcessDelayedPropsNodes();
-    });
+    if (const auto uiManger = Microsoft::ReactNative::GetNativeUIManager(*context).lock()) {
+      uiManger->AddBatchCompletedCallback([this]() { ProcessDelayedPropsNodes(); });
+    }
   }
 }
 

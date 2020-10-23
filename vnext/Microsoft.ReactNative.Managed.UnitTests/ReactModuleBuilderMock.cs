@@ -230,7 +230,7 @@ namespace Microsoft.ReactNative.Managed.UnitTests
     private static T GetResult<T>(IJSValueWriter writer)
     {
       var resulReader = new JSValueTreeReader((writer as JSValueTreeWriter).TakeValue());
-      resulReader.ReadArgs(out T result);
+      resulReader.ReadValue(out T result);
       return result;
     }
 
@@ -332,5 +332,25 @@ namespace Microsoft.ReactNative.Managed.UnitTests
     {
       m_builder.EmitJSEvent(eventEmitterName, eventName, paramsArgWriter);
     }
+
+    bool IReactContext.DebuggerBreakOnNextLine => throw new NotImplementedException();
+
+    ushort IReactContext.DebuggerPort => throw new NotImplementedException();
+
+    bool IReactContext.UseDirectDebugger => throw new NotImplementedException();
+
+    bool IReactContext.UseFastRefresh => throw new NotImplementedException();
+
+    bool IReactContext.UseWebDebugger => throw new NotImplementedException();
+
+    string IReactContext.BundleRootPath => throw new NotImplementedException();
+
+    string IReactContext.DebugBundlePath => throw new NotImplementedException();
+
+    string IReactContext.JavaScriptBundleFile => throw new NotImplementedException();
+
+    string IReactContext.SourceBundleHost => throw new NotImplementedException();
+
+    ushort IReactContext.SourceBundlePort => throw new NotImplementedException();
   }
 }

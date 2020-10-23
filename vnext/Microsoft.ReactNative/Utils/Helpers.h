@@ -4,7 +4,8 @@
 #pragma once
 
 #include <IReactInstance.h>
-#include <folly/dynamic.h>
+#include <JSValue.h>
+#include <React.h>
 #include <stdint.h>
 
 namespace react::uwp {
@@ -17,11 +18,11 @@ struct ReactId {
 };
 
 template <typename T>
-inline typename T asEnum(folly::dynamic const &obj) {
-  return static_cast<T>(obj.asInt());
+inline typename T asEnum(winrt::Microsoft::ReactNative::JSValue const &obj) {
+  return static_cast<T>(obj.AsInt64());
 }
 
-ReactId getViewId(_In_ IReactInstance *instance, xaml::FrameworkElement const &fe);
+ReactId getViewId(const Mso::React::IReactContext &context, xaml::FrameworkElement const &fe);
 std::int32_t CountOpenPopups();
 
 bool IsRS3OrHigher();

@@ -4,7 +4,7 @@
 #pragma once
 #include <folly/dynamic.h>
 
-#include <IReactInstance.h>
+#include <React.h>
 #include <winrt/Windows.UI.ViewManagement.Core.h>
 
 namespace winrt {
@@ -12,11 +12,11 @@ using namespace Windows::Foundation::Collections;
 using namespace Windows::UI::ViewManagement::Core;
 } // namespace winrt
 
-namespace react::uwp {
+namespace Microsoft::ReactNative {
 
 class SIPEventHandler {
  public:
-  SIPEventHandler(const std::weak_ptr<IReactInstance> &reactInstance);
+  SIPEventHandler(const Mso::React::IReactContext &context);
   virtual ~SIPEventHandler();
 
   bool IsSIPShowing() {
@@ -30,7 +30,7 @@ class SIPEventHandler {
  private:
   bool IsOcclusionsEmpty(winrt::IVectorView<winrt::CoreInputViewOcclusion> occlusions);
   void SendEvent(std::string &&eventName, folly::dynamic &&parameters);
-  std::weak_ptr<IReactInstance> m_wkReactInstance;
+  Mso::CntPtr<const Mso::React::IReactContext> m_context;
   winrt::CoreInputView::OcclusionsChanged_revoker m_occlusionsChanged_revoker;
   winrt::Rect m_finalRect;
   winrt::CoreInputView m_coreInputView{nullptr};
@@ -42,4 +42,4 @@ class SIPEventHandler {
   void InitializeCoreInputView();
 };
 
-} // namespace react::uwp
+} // namespace Microsoft::ReactNative

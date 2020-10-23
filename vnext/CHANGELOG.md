@@ -1,8 +1,139 @@
 # Change Log - react-native-windows
 
-This log was last generated on Sat, 26 Sep 2020 05:04:21 GMT and should not be manually modified.
+This log was last generated on Fri, 23 Oct 2020 05:04:37 GMT and should not be manually modified.
 
 <!-- Start content -->
+
+## 0.0.0-canary.187
+
+Fri, 23 Oct 2020 05:04:37 GMT
+
+### Changes
+
+- Enable onFocus() and onBlur() callbacks on Pressable. Allow calling .focus() and .blur() on Pressable. (igklemen@microsoft.com)
+
+## 0.0.0-canary.186
+
+Thu, 22 Oct 2020 05:06:28 GMT
+
+### Changes
+
+- Fix ReactContext::EmitJSEvent arg passing (vmorozov@microsoft.com)
+- raise change event when dimensions change (kmelmon@microsoft.com)
+- Integrate 8/25 Nightly RN Build (ngerlem@microsoft.com)
+- Move UIManager to NM2 infra (30809111+acoates-ms@users.noreply.github.com)
+
+## 0.0.0-canary.185
+
+Wed, 21 Oct 2020 05:05:24 GMT
+
+### Changes
+
+- Fix Crash when Logbox shown on pre-19H1 (ngerlem@microsoft.com)
+- Make native modules to use JS queue (vmorozov@microsoft.com)
+- Drop Issue Requirement from Override Manifest Schema Validation (ngerlem@microsoft.com)
+
+## 0.0.0-canary.184
+
+Tue, 20 Oct 2020 05:03:56 GMT
+
+### Changes
+
+- Switch was generating spurious events which could result on two events (on/off) being sent before the first event was fully handled (gill.peacegood@axsy.com)
+- Update Chakra JSI implementation (vmorozov@microsoft.com)
+- Sync native module functions are wrapping the result in an array, which it shouldnt (30809111+acoates-ms@users.noreply.github.com)
+
+## 0.0.0-canary.181
+
+Sat, 10 Oct 2020 05:04:10 GMT
+
+### Changes
+
+- Fixed missing folly headers on publish (jthysell@microsoft.com)
+
+## 0.0.0-canary.180
+
+Fri, 09 Oct 2020 05:06:32 GMT
+
+### Changes
+
+- removed no longer used polyester controls (chiara.mooney@gmail.com)
+- Change order of JavaScript tests to get failures earlier (dannyvv@microsoft.com)
+- Integrate 8/20 Nightly RN Build (Extract RNTester) (ngerlem@microsoft.com)
+- Update System.Private.Uri version for C# codegen for unittest (dannyvv@microsoft.com)
+- Consolidate WebSocketModules (julio.rocha@microsoft.com)
+- update folly version to fix folly bug 1454 (asklar@winse.microsoft.com)
+
+## 0.0.0-canary.179
+
+Tue, 06 Oct 2020 05:04:27 GMT
+
+### Changes
+
+- Remove ILegacyReactInstance, and react::uwp::IReactInstance (30809111+acoates-ms@users.noreply.github.com)
+- Update System.Private.Uri version for C# codegen (dannyvv@microsoft.com)
+
+## 0.0.0-canary.178
+
+Sun, 04 Oct 2020 05:04:25 GMT
+
+### Changes
+
+- Remove the other TimingModule Assertion (ngerlem@microsoft.com)
+
+## 0.0.0-canary.177
+
+Sat, 03 Oct 2020 05:04:45 GMT
+
+### Changes
+
+- Fix native modules not being re-initialized on reload (tn0502@gmail.com)
+- Integrate 8/19 Nightly RN Build (ngerlem@microsoft.com)
+- Allow Default baseVersion in Override Manfests (ngerlem@microsoft.com)
+
+## 0.0.0-canary.176
+
+Fri, 02 Oct 2020 05:05:22 GMT
+
+### Changes
+
+- Expose getters for some instance settings on reactcontext (30809111+acoates-ms@users.noreply.github.com)
+- Integrate 8/5 Nightly RN Build (ngerlem@microsoft.com)
+- Image - fix pre-1903 crash (email not defined)
+- Integrate 8/17 Nightly RN Build (ngerlem@microsoft.com)
+- Use lessthrow_await_adapter in Desktop WebSocket resource (julio.rocha@microsoft.com)
+
+## 0.0.0-canary.175
+
+Thu, 01 Oct 2020 05:08:11 GMT
+
+### Changes
+
+- Integrate 7/29 Nightly Build (ngerlem@microsoft.com)
+- Remove Microsoft user names from sourcecode (dannyvv@microsoft.com)
+- ESLint Fixup (ngerlem@microsoft.com)
+
+## 0.0.0-canary.174
+
+Wed, 30 Sep 2020 05:06:49 GMT
+
+### Changes
+
+- Simplify react::uwp::IReactInstance (vmorozov@microsoft.com)
+- Initial ABI-safe JSI implementation (vmorozov@microsoft.com)
+- Add react-native-platform-override macOS Support (nick@nickgerleman.com)
+- integrate RN 7/7 build (igklemen@microsoft.com)
+
+## 0.0.0-canary.173
+
+Tue, 29 Sep 2020 05:05:53 GMT
+
+### Changes
+
+- Remove Special UI When Debugger Attached (ngerlem@microsoft.com)
+- Reduce Microsoft.ReactNative PCH By 155MB-260MB (ngerlem@microsoft.com)
+- Remove TestMessageQueueThread. (julio.rocha@microsoft.com)
+- Don't reload the ReactNativeHost multiple times (ryan.fowler@singlewire.com)
 
 ## 0.0.0-canary.172
 

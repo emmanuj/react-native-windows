@@ -15,8 +15,7 @@
 #include <Modules/LinkingManagerModule.h>
 #include <Modules/NativeUIManager.h>
 #include <Modules/NetworkingModule.h>
-#include <Modules/UIManagerModule.h>
-#include <Modules/WebSocketModuleUwp.h>
+#include <Modules/PaperUIManagerModule.h>
 #include <Threading/MessageQueueThreadFactory.h>
 
 // Shared
@@ -44,27 +43,17 @@ bool HasPackageIdentity() noexcept {
 } // namespace
 
 std::vector<facebook::react::NativeModuleDescription> GetCoreModules(
-    const std::shared_ptr<facebook::react::IUIManager> &uiManager,
     const std::shared_ptr<facebook::react::MessageQueueThread> &batchingUIMessageQueue,
-    const std::shared_ptr<facebook::react::MessageQueueThread>
-        &uiMessageQueue, // UI queue without batching or affinity limitations
     const std::shared_ptr<facebook::react::MessageQueueThread>
         &jsMessageQueue, // JS engine thread (what we use for external modules)
     std::shared_ptr<react::uwp::AppTheme> &&appTheme,
     Mso::CntPtr<AppearanceChangeListener> &&appearanceListener,
-    const std::shared_ptr<IReactInstance> &uwpInstance) noexcept {
+    Mso::CntPtr<Mso::React::IReactContext> &&context) noexcept {
   std::vector<facebook::react::NativeModuleDescription> modules;
 
   modules.emplace_back(
-      "UIManager",
-      [uiManager, uiMessageQueue]() {
-        return facebook::react::createUIManagerModule(std::shared_ptr(uiManager), std::shared_ptr(uiMessageQueue));
-      },
-      batchingUIMessageQueue);
-
-  modules.emplace_back(
-      react::uwp::WebSocketModule::Name,
-      []() { return std::make_unique<react::uwp::WebSocketModule>(); },
+      "WebSocketModule",
+      [context]() { return Microsoft::React::CreateWebSocketModule(Mso::CntPtr<Mso::React::IReactContext>(context)); },
       jsMessageQueue);
 
   modules.emplace_back(
@@ -94,9 +83,7 @@ std::vector<facebook::react::NativeModuleDescription> GetCoreModules(
 
   modules.emplace_back(
       NativeAnimatedModule::name,
-      [wpUwpInstance = std::weak_ptr(uwpInstance)]() mutable {
-        return std::make_unique<NativeAnimatedModule>(std::move(wpUwpInstance));
-      },
+      [context = std::move(context)]() mutable { return std::make_unique<NativeAnimatedModule>(std::move(context)); },
       batchingUIMessageQueue);
 
   modules.emplace_back(

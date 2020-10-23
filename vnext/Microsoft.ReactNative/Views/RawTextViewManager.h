@@ -7,15 +7,15 @@
 
 #include <folly/dynamic.h>
 
-namespace react::uwp {
+namespace Microsoft::ReactNative {
 
 class RawTextViewManager : public ViewManagerBase {
   using Super = ViewManagerBase;
 
  public:
-  RawTextViewManager(const std::shared_ptr<IReactInstance> &reactInstance);
+  RawTextViewManager(const Mso::React::IReactContext &context);
 
-  const char *GetName() const override;
+  const wchar_t *GetName() const override;
 
   void SetLayoutProps(
       ShadowNodeBase &nodeToUpdate,
@@ -30,12 +30,12 @@ class RawTextViewManager : public ViewManagerBase {
   bool UpdateProperty(
       ShadowNodeBase *nodeToUpdate,
       const std::string &propertyName,
-      const folly::dynamic &propertyValue) override;
+      const winrt::Microsoft::ReactNative::JSValue &propertyValue) override;
 
   XamlView CreateViewCore(int64_t tag) override;
 
  private:
-  void NotifyAncestorsTextChanged(IReactInstance *instance, ShadowNodeBase *nodeToUpdate);
+  void NotifyAncestorsTextChanged(ShadowNodeBase *nodeToUpdate);
 };
 
-} // namespace react::uwp
+} // namespace Microsoft::ReactNative

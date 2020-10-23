@@ -1,8 +1,51 @@
 # Change Log - react-native-platform-override
 
-This log was last generated on Thu, 24 Sep 2020 05:06:21 GMT and should not be manually modified.
+This log was last generated on Wed, 21 Oct 2020 05:05:24 GMT and should not be manually modified.
 
 <!-- Start content -->
+
+## 0.4.0
+
+Wed, 21 Oct 2020 05:05:24 GMT
+
+### Minor changes
+
+- Allow Multiple Manifests in Monorepos (ngerlem@microsoft.com)
+- Drop Issue Requirement from Override Manifest Schema Validation (ngerlem@microsoft.com)
+
+## 0.3.3
+
+Sat, 03 Oct 2020 05:04:45 GMT
+
+### Patches
+
+- Allow Default baseVersion in Override Manfests (ngerlem@microsoft.com)
+- Add command to diff overrides (ngerlem@microsoft.com)
+
+## 0.3.2
+
+Fri, 02 Oct 2020 05:05:22 GMT
+
+### Patches
+
+- Add some extra error handling to GitReactFileRepository (ngerlem@microsoft.com)
+
+## 0.3.1
+
+Thu, 01 Oct 2020 05:08:11 GMT
+
+### Patches
+
+- ESLint Fixup (ngerlem@microsoft.com)
+- Fix applying patches when case is mismatched (ngerlem@microsoft.com)
+
+## 0.3.0
+
+Wed, 30 Sep 2020 05:06:49 GMT
+
+### Minor changes
+
+- macOS Support (nick@nickgerleman.com)
 
 ## 0.2.8
 
